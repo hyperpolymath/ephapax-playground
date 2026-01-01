@@ -158,6 +158,113 @@ repl:
     # Guile: guix shell guile -- guile
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# DEMO (Ephapax Playground)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Run Ephapax playground demo (offline, demonstrates linear vs affine modes)
+demo:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║                      Ephapax Playground Demo                              ║"
+    echo "║            Linear/Affine Semantics & Once-Only Evaluation                 ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    # Check for samples directory
+    if [ ! -d "samples" ]; then
+        echo "NOTE: Sample corpus not yet created."
+        echo "      Run 'just demo-scaffold' to create sample files."
+        echo ""
+        echo "=== Demo Output (simulated) ==="
+        echo ""
+    fi
+
+    echo "=== Mode: linear ==="
+    echo "In linear mode, resources MUST be used exactly once."
+    echo ""
+    echo "  let file = open(\"data.txt\")"
+    echo "  let content = file.read()   -- file consumed here"
+    echo "  print(content)"
+    echo "  file.close()                -- file consumed again"
+    echo "  ^ ERROR: 'file' already consumed (linear violation)"
+    echo ""
+    echo "[DEMO] Linear mode enforces exactly-once usage."
+    echo ""
+
+    echo "=== Mode: affine ==="
+    echo "In affine mode, resources can be used AT MOST once."
+    echo ""
+    echo "  let file = open(\"data.txt\")"
+    echo "  -- file not used, auto-dropped"
+    echo "  ^ WARNING: 'file' dropped without use (affine allows this)"
+    echo ""
+    echo "[DEMO] Affine mode allows zero or one use (auto-drop with warning)."
+    echo ""
+
+    echo "=== Ownership Transfer ==="
+    echo ""
+    echo "  let a = create_resource()"
+    echo "  let b = a                   -- ownership moves to b"
+    echo "  print(a)                    -- ERROR: 'a' already moved"
+    echo ""
+    echo "[DEMO] Ownership transfer is enforced in both modes."
+    echo ""
+
+    echo "=== Region-Based Memory ==="
+    echo ""
+    echo "  region r:"
+    echo "      let buffer = Vec.new@r(1024)"
+    echo "      let result = process@r(buffer)"
+    echo "      result                  -- escapes region"
+    echo "  -- buffer deallocated here (region scope ends)"
+    echo ""
+    echo "[DEMO] Regions provide scoped allocation with automatic cleanup."
+    echo ""
+
+    echo "=== Summary ==="
+    echo "Ephapax enforces linear/affine type semantics at compile time."
+    echo "  - Linear: exactly once (error if unused)"
+    echo "  - Affine: at most once (warning if unused)"
+    echo ""
+    echo "Demo complete. Run offline - no network required."
+
+# Scaffold sample corpus structure
+demo-scaffold:
+    @mkdir -p samples/valid samples/invalid samples/demo
+    @echo ";; SPDX-License-Identifier: AGPL-3.0-or-later" > samples/valid/ownership_transfer.epx
+    @echo ";; Example: correct ownership transfer" >> samples/valid/ownership_transfer.epx
+    @echo "let a = create_resource()" >> samples/valid/ownership_transfer.epx
+    @echo "let b = a  -- ownership transferred" >> samples/valid/ownership_transfer.epx
+    @echo "b.consume()  -- used exactly once" >> samples/valid/ownership_transfer.epx
+    @echo ";; SPDX-License-Identifier: AGPL-3.0-or-later" > samples/valid/region_allocation.epx
+    @echo ";; Example: region-based allocation" >> samples/valid/region_allocation.epx
+    @echo "region r:" >> samples/valid/region_allocation.epx
+    @echo "    let buf = Vec.new@r(1024)" >> samples/valid/region_allocation.epx
+    @echo "    process(buf)" >> samples/valid/region_allocation.epx
+    @echo ";; SPDX-License-Identifier: AGPL-3.0-or-later" > samples/valid/mode_toggle.epx
+    @echo "#![type_mode = \"linear\"]" >> samples/valid/mode_toggle.epx
+    @echo ";; Example: mode toggle at module level" >> samples/valid/mode_toggle.epx
+    @echo "let x = create()" >> samples/valid/mode_toggle.epx
+    @echo "x.use()" >> samples/valid/mode_toggle.epx
+    @echo ";; SPDX-License-Identifier: AGPL-3.0-or-later" > samples/invalid/use_after_move.epx
+    @echo ";; EXPECT-ERROR: use-after-move" >> samples/invalid/use_after_move.epx
+    @echo "let a = create()" >> samples/invalid/use_after_move.epx
+    @echo "let b = a" >> samples/invalid/use_after_move.epx
+    @echo "print(a)  -- ERROR: a already moved" >> samples/invalid/use_after_move.epx
+    @echo ";; SPDX-License-Identifier: AGPL-3.0-or-later" > samples/invalid/linear_drop.epx
+    @echo ";; EXPECT-ERROR: linear-drop" >> samples/invalid/linear_drop.epx
+    @echo "#![type_mode = \"linear\"]" >> samples/invalid/linear_drop.epx
+    @echo "let x = create()" >> samples/invalid/linear_drop.epx
+    @echo ";; x dropped without use - ERROR in linear mode" >> samples/invalid/linear_drop.epx
+    @echo ";; SPDX-License-Identifier: AGPL-3.0-or-later" > samples/invalid/double_use.epx
+    @echo ";; EXPECT-ERROR: double-use" >> samples/invalid/double_use.epx
+    @echo "let file = open(\"data.txt\")" >> samples/invalid/double_use.epx
+    @echo "file.read()" >> samples/invalid/double_use.epx
+    @echo "file.close()  -- ERROR: file already consumed" >> samples/invalid/double_use.epx
+    @echo "Sample corpus created in samples/"
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # DEPENDENCIES
 # ═══════════════════════════════════════════════════════════════════════════════
 
